@@ -1,3 +1,5 @@
+> Esse artigo está em desenvolvimento e pode conter informações imprecisas e falhas ortográficas não intencionais
+
 ## Introdução
 
 Rust é estranho. Eu sei, você sabe, o psicopata maluco que diz que JavaScript é a melhor linguagem sabe. Ainda assim, uma das coisas mais esquisitas em Rust é definitivamente a forma que ele gerencia a memória. São uma série de regras sem pé, nem cabeça que quase ninguém entende no inicio e a única utilidade aparente é fazer seu código não compilar. E é isso que a gente vai estudar hoje.
@@ -52,7 +54,7 @@ O motivo de existir tantos tipos é por levar em consideração o tamanho antes 
 
 Okay, mas porque o inteiro tem tamanho definido e a string não? 
 
-Vamos discutir o tamanho de uma string que contém um nome. Por exemplo, meu nome possui 18 letras e dois espaços, o que equivale a aproximadamente 20 bytes, ou seja, 160 bits. Isso é consideravelmente menor do que o número mencionado anteriormente.
+Vamos discutir o tamanho de uma string que contém um nome. Por exemplo, meu nome possui 18 letras e dois espaços, o que equivale a aproximadamente 20 bytes, ou seja, 160 bits. Isso é consideravelmente maior do que o número mencionado anteriormente.
 
 Agora, se pensarmos em uma redação sobre o tamanho da trolha de um cavalo, ela pode facilmente ultrapassar os 8000 bits (de acordo com minhas pesquisas). Essa diferença é significativa demais para justificar a criação de diferentes tipos de strings com tamanhos predefinidos. Portanto, é melhor deixar que o tamanho das strings ser definido dinamicamente durante o uso, acomodando assim uma ampla variedade de informações sem desperdiçar espaço em memória.
 
