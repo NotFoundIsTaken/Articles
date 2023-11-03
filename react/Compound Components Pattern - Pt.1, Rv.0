@@ -1,0 +1,346 @@
+# Compound Components Pattern - Pt.1, Rv.0
+
+## Componente Composto (Compound Components Pattern)
+
+Imagine que voçê tem uma lista. Uma lista simples de itens, como nome de pessoas. E também precisa criar um componente React para mostrar esses itens na tela. Uma possivel solução seria:
+
+```tsx
+const NameList: FC<Props> = ({ names }) => {
+    const listItems = names.map((e, index) => <li key={index}>{e}</li>);
+    return <ul>{listItems}</ul>;
+};
+
+const App: FC = () => {
+    return <div><NameList names={["Ana", "Carlos"]} /></div>
+};
+```
+
+A primeira vista não há problema algum, ela funciona bem para o seu propósito. Agora, vamos supor que você precise que esse componente seja capaz de mostrar as palavras em ordem inversa por algum motivo. Vamos fazer de uma forma mais complicada de propósito:
+
+```tsx
+const NameList: FC<Props> = ({ names, textReversed }) => { 
+	const listItems = names.map((e, index) => {
+		if (!textReversed) return <li key={index}>{e}</li>;
+		
+		const text = e.split("").reverse().join("");
+		return <li key={index}>{text}</li>;
+	});
+		
+	return <ul>{listItems}</ul>; 
+};
+```
+
+Pior, mas ainda simples de certa forma. E se agora eu quiser filtrar pela primeira letra? 
+
+```tsx
+const NameList: FC<Props> = ({ names, textReversed, filterByFirstLetter }) => {
+	let filteredNames = names;
+	if (filterByFirstLetter) {
+		filteredNames = names
+			.filter((name) => name.startsWith(filterByFirstLetter));
+		}
+		
+	const listItems = filteredNames.map((e, index) => {
+		if (!textReversed) return <li key={index}>{e}</li>;
+		
+		const text = e.split("").reverse().join("");
+		return <li key={index}>{text}</li>;
+	});
+	return <ul>{listItems}</ul>;
+};
+```
+
+A essa altura, você já deve ter começado a entender: cada modificação toda o novo código mais complicado do que o anterior. Não só isso, aqui também estamos quebrando alguns principios solid importantes - O nosso código não só tem mais de uma responsabilidade, como também toda vez que precisamos modificar algo temos que alterar o que já existe.
+
+
+Pensando no problema, uma forma comum de resolver esse caso seria criando componentes semelhantes, porém com funcionalidades levemente diferentes, como uma lista (NameList) comum e outra reversa (NameListReversed). Infelizmente, isso criaria duplicação no código, o qual é potencialmente tão ruim quanto o que estamos fazendo agora.
+
+### Exemplo de Solução
+
+Uma das ideias de design de software mais importantes na hora de abstrair algo é "isole o que muda". Isso significa que nossa principal preocupação é de alguma forma isolar `textReverse` e `filterByLetter`, uma vez que são essas propriedades que causam maiores impactos em nosso código. 
+
+Então, nossa primeira abordagem é simplesmente extrair o `<li>` para fora de listItems, permitindo uma maior liberdade na orquestração dos dados dentro das listas. Para isso, usamos a propriedade children. 
+
+```tsx
+const NameList: FC<Props> = ({ children }) => {
+	return <ul>{children}</ul>;
+};
+```
+
+Por um lado, resolvemos o problema do componente NameList, por outro...
+
+```tsx
+const App: FC = () => {
+	const names = ["Ana", "Carlos"];
+	const filteredNames = names.filter((name) => name.startsWith("A"));
+	
+	const listItems = filteredNames.map((e, index) => {
+		const text = e.split("").reverse().join("");
+		return <li key={index}>{text}</li>;
+	});
+	
+	return (
+		<div>
+			<NameList>{listItems}</NameList>
+		</div>
+	);
+};
+```
+
+> Sim, eu sei que poderia usar o map e o filter direto na array, mas qual seria a graça?
+
+Por outro lado o App ficou extremamente poluido. O que não seria um problema, mas nos esperamos usar esse mesmo comportamento em outros lugares. Por tanto, vamos criar mais um componente. 
+
+```tsx
+const NameList: FC<Props> = ({ children }) => {
+	return <ul>{children}</ul>;
+};
+
+const Item: FC<ItemProps> = ({ text, reversed }) => {
+	return <li>{reversed ? text.split("").reverse().join("") : text}</li>;
+};
+
+const App: FC = () => {
+	const names = ["Ana", "Carlos"];
+	const filteredNames = names.filter((name) => name.startsWith("A"));
+
+	return (
+		<div>
+			<NameList>
+				{filteredNames.map((e, idx) => (
+					<Item text={e} key={idx} reversed />
+				))}
+			</NameList>
+		</div>
+	);
+};
+```
+
+Com uma mudança simples conseguimos deixar o código mais legivel, mas qual o proposito disso? No final, não estamos criando apenas mais componentes?
+
+Sim, esse é o caso: estamos criando mais componentes. Esse padrão, o compound components, se trata justamente de componentes menores para resolver problemas especificos. Porém, nós tratamos esses componentes como um só, pois eles não só compartilham caracteristicas, mas também estados.
+
+## Organizando o componente 
+
+Nosso componente ainda não está pronto, não resolvemos o problema com os filtros, porém já temos um começo. Sendo assim, vamos começar a organiza-lo.
+
+Primeiro, criamos uma pasta `components` dentro da `src`. 
+
+```sh
+project-root/
+├── public/
+├── src/
+│   ├── components/
+```
+
+A arquitetura e nomencratura aqui não importa muito, porém é interessante criar os componentes relacionados dentro de uma mesma pasta, aqui irei chamar de `AppList`.
+
+Nela, temos os seguintes arquivos:
+
+```sh
+project-root/
+├── public/
+├── src/
+│   ├── components/
+│   │   ├── AppList/
+│   │   │   ├── index.ts
+│   │   │   ├── Item.tsx
+│   │   │   └── Root.tsx
+│   │   └── ...
+```
+
+O arquivo `index.ts` serve apenas para reexport. 
+
+```tsx
+// src/components/AppList/index.ts
+import { Root } from "./Root";
+import { Item } from "./Item";
+
+export default {
+	Root,
+	Item,
+};
+```
+
+O Item segue o mesmo, apenas com a interface com nome diferente.
+
+```tsx
+// src/components/AppList/Item.tsx
+import { FC } from "react";
+
+interface Props {
+	text: string;
+	reversed: boolean;
+}
+
+const Item: FC<Props> = ({ text, reversed }) => {
+	return <li>{reversed ? text.split("").reverse().join("") : text}</li>;
+};
+
+export { Item };
+```
+
+NameList agora se chama Root, uma vez que ela é o componente principal do "pacote". Como foi definido no `index.ts`, ela sera chamada como default. 
+
+```tsx
+// src/components/AppList/Root.tsx
+import { FC, ReactNode } from "react";
+
+interface Props {
+	children: ReactNode;
+}
+
+const Root: FC<Props> = ({ children }) => {
+	return <ul>{children}</ul>;
+};
+
+export { Root };
+```
+
+Por fim, o nosso `App.tsx` segue de forma semelhante, apenas com poucas alterações, relacionadas principalmente ao import. 
+
+```tsx
+// src/App.tsx
+import "./App.css";
+import { FC } from "react";
+import AppList from "./components/AppList";
+
+const App: FC = () => {
+	const names = ["Ana", "Carlos"];
+	const filteredNames = names.filter((name) => name.startsWith("A"));
+	
+	return (
+	<div>
+		<AppList.Root>
+			{filteredNames.map((e, idx) => (
+				<AppList.Item text={e} key={idx} reversed />
+			))}
+		</AppList.Root>
+	</div>
+	);
+};
+
+export default App;
+```
+
+Okay, mas qual é a utilidade disso? Não é o mesmo que criar dois componentes comuns? Sim, nesse caso é o mesmo. Porém, estamos fazendo isso de forma mais organizada. 
+
+Nomear componentes, ordena-los e organiza-los é sempre um problema. Componentes compostos são uma solução. Aqui podemos criar vários pequenos componentes com comportamentos diferentes de agrupá-los em conjuntos como uma unidade, sem se preocupar com um afetando outro. 
+
+É claro, o compound pattern não para por ai. Ainda temos que lidar com a propriedade `filteredNames`.
+
+## Usando contexto 
+
+A ideia por trás de filtrar os nomes é relativamente simples:
+- Se o nome começa com determinada letra, ele deve ser renderizado;
+- Se não começa, não iremos mostrar nada;
+- A configuração deve ser passada diretamente no `<AppList.Root />`
+
+Começemos então pelo index, de onde vem nossos exports. Novamente, a configuração deve ser passada na Root, mas afetar os elementos dentro dela, por tanto, para isso utilizaremos o React Context. 
+
+```tsx
+// src/components/AppList/index.ts
+import { createContext } from "react";
+import { Root } from "./Root";
+import { Item } from "./Item";
+
+export const FirstLetterContext = createContext<string>("");
+
+export default {
+	Root,
+	Item,
+};
+```
+
+Com o context configurado, iremos *prover* a informação para ele, diretamente do `Root.tsx`.
+
+```tsx
+// src/components/AppList/Root.tsx
+import { FC, ReactNode } from "react";
+import { FirstLetterContext } from ".";
+
+interface Props {
+	children: ReactNode;
+	filterByFirstLetter?: string; // parametro opcional
+}
+
+const Root: FC<Props> = ({ children, filterByFirstLetter }) => {
+	return (
+		<FirstLetterContext.Provider value={filterByFirstLetter ?? ""}>
+			<ul>{children}</ul>
+		</FirstLetterContext.Provider>
+	);
+};
+
+export { Root };
+```
+
+Por fim, vamos *consumir* a informação dentro do `Item.tsx`.
+
+```tsx
+// src/components/AppList/Item.tsx
+import { FC, useContext } from "react";
+import { FirstLetterContext } from ".";
+
+interface Props {
+	text: string;
+	reversed: boolean;
+}
+
+const Item: FC<Props> = ({ text, reversed }) => {
+	const firstLetter = useContext(FirstLetterContext);
+
+	if (!text.startsWith(firstLetter)) 
+		return;
+
+	return <li>{reversed ? text.split("").reverse().join("") : text}</li>;
+};
+
+export { Item };
+```
+
+Por fim, podemos comparar o antes e depois para ter uma melhor noção do desenvolvimento. 
+
+```tsx
+// antes
+const App: FC = () => {
+	const names = ["Ana", "Carlos"];
+	const filteredNames = names.filter((name) => name.startsWith("A"));
+	
+	const listItems = filteredNames.map((e, index) => {
+		const text = e.split("").reverse().join("");
+		return <li key={index}>{text}</li>;
+	});
+	
+	return (
+		<div>
+			<NameList>{listItems}</NameList>
+		</div>
+	);
+};
+
+// depois
+const App: FC = () => {
+	const names = ["Ana", "Carlos"];
+	
+	return (
+		<div>
+			<AppList.Root filterByFirstLetter="A">
+				{names.map((e, idx) => (
+					<AppList.Item text={e} key={idx} reversed />
+				))}
+			</AppList.Root>
+		</div>
+	);
+};
+```
+
+## Conclusão
+
+Primeiro, sim, agora temos mais componentes JSX. Em muitos casos isso pode ser particularmente ruim. Porém, temos bem menos lógica em Typescript, além disso essa lógica está contida dentro dos componentes. 
+
+Antes, se deixassemos a lógica dentro dos componentes teriamos um problema com o Open-Closed Principle, uma vez que praticamente toda forma de auteração causaria algum grau de modificação. Se a lógica fosse transferida para o componente pai, teriamos um problema com o DRY, e estariamos correndo o risco de repetir código. Agora, com o compound components, temos uma solução para ambos casos, a custo de gerar mais JSX. 
+
+Outra coisa importante é que o agrupamento de pequenos componentes para formar um maior não é só uma questão estrutural, tem muito a ver com a passagem de contexto. Caso fosse feito de outra forma, teriamos que espalhar o contexto por mais pastas, prejudicando o isolamento do código.
+
+No final das contas, a arquitetura é uma questão de escolha. Essas escolhas tendem a seguir as decisões que geram menos gasto de tempo e dinheiro. Compound components são bons para componentes que precisam ser altamente customizaveis e tenham um tamanho razoável, tanto em escopo quando fisicamente no código. Em muitos casos, como um botão, input ou anchor, o esforço é desnecessário e acaba se tornando uma perda de tempo. 
